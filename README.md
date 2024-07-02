@@ -1,200 +1,63 @@
-# VL-BERT
+# 中文多模态bert
 
-By 
-[Weijie Su](https://www.weijiesu.com/), 
-[Xizhou Zhu](https://scholar.google.com/citations?user=02RXI00AAAAJ&hl=en), 
-[Yue Cao](http://yue-cao.me/), 
-[Bin Li](http://staff.ustc.edu.cn/~binli/), 
-[Lewei Lu](https://www.linkedin.com/in/lewei-lu-94015977/), 
-[Furu Wei](http://mindio.org/), 
-[Jifeng Dai](https://jifengdai.org/).
+bert的提出极大得推动了NLP的发展，但随着多模态任务的增多（这在很多企业中已经成为一种常见的任务），单纯的NLPBert已经无法满足需求。
 
-This repository is an official implementation of the paper 
-[VL-BERT: Pre-training of Generic Visual-Linguistic Representations](https://arxiv.org/abs/1908.08530).
+后续看到了很多的paper也陆续都采用了transformer预训练多模态bert，但都基本是英文领域。
 
+该项目主要是预训练中文的多模态Bert，也是为了以后的多模态任务提供基本的模型
+
+## 相关paper
+[参考](https://mp.weixin.qq.com/s/THxlQX2MPXua0_N0Ug0EWA)
+
+1. VisualBERT 
 
 
-*Update on 2020/01/16* Add code of visualization.
+论文标题：VisualBERT: A Simple and Performant Baseline for Vision and Language
+论文链接：https://arxiv.org/abs/1908.03557
+源码链接：https://github.com/uclanlp/visualbert
 
+和 BERT 类似，VisualBERT 在结构上采用了堆叠的 Transformer。其在一开始就将文字和图片信息通过 Transformer 的自注意力机制进行对齐融合。
 
-
-*Update on 2019/12/20* Our VL-BERT got accepted by ICLR 2020.
-
-## Introduction
-
-VL-BERT is a simple yet powerful pre-trainable generic representation for visual-linguistic tasks. 
-It is pre-trained on the massive-scale caption dataset and text-only corpus, 
-and can be fine-tuned for various down-stream visual-linguistic tasks, 
-such as Visual Commonsense Reasoning, Visual Question Answering and Referring Expression Comprehension.
-
-![](./figs/pretrain.png)
-
-![](./figs/attention_viz.png)
-
-Thanks to PyTorch and its 3rd-party libraries, this codebase also contains following features:
-* Distributed Training
-* FP16 Mixed-Precision Training
-* Various Optimizers and Learning Rate Schedulers
-* Gradient Accumulation
-* Monitoring the Training Using TensorboardX
-
-## Citing VL-BERT
-```bibtex
-@inproceedings{
-  Su2020VL-BERT:,
-  title={VL-BERT: Pre-training of Generic Visual-Linguistic Representations},
-  author={Weijie Su and Xizhou Zhu and Yue Cao and Bin Li and Lewei Lu and Furu Wei and Jifeng Dai},
-  booktitle={International Conference on Learning Representations},
-  year={2020},
-  url={https://openreview.net/forum?id=SygXPaEYvH}
-}
-```
-
-## Prepare
-
-### Environment
-* Ubuntu 16.04, CUDA 9.0, GCC 4.9.4
-* Python 3.6.x
-    ```bash
-    # We recommend you to use Anaconda/Miniconda to create a conda environment
-    conda create -n vl-bert python=3.6 pip
-    conda activate vl-bert
-    ```
-* PyTorch 1.0.0 or 1.1.0
-    ```bash
-    conda install pytorch=1.1.0 cudatoolkit=9.0 -c pytorch
-    ```
-* Apex (optional, for speed-up and fp16 training)
-    ```bash
-    git clone https://github.com/jackroos/apex
-    cd ./apex
-    pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./  
-    ```
-* Other requirements:
-    ```bash
-    pip install Cython
-    pip install -r requirements.txt
-    ```
-* Compile
-    ```bash
-    ./scripts/init.sh
-    ```
-
-### Data
-
-See [PREPARE_DATA.md](data/PREPARE_DATA.md).
-
-### Pre-trained Models
-
-See [PREPARE_PRETRAINED_MODELS.md](model/pretrained_model/PREPARE_PRETRAINED_MODELS.md).
+其文字部分的输入为原始的 BERT 文字输入（词向量+位置编码+片段编码）加上 Token/Image 编码来表示其是图片或文字，而图片部分的输入则是采用通过 Faster-RCNN 提取的图片区域特征加上相应的位置编码，片段编码和 Token/Image 编码（如下图右侧所示）。
 
 
 
-## Training
+VisualBERT 遵循 BERT 一样的流程，先进行预训练然后在相应的任务上进行微调，其采用了两个预训练任务：第一个是和 BERT 一样的语言掩码，第二个则是句子-图像预测 （即判断输入的句子是否为相应图片的描述）。
 
-### Distributed Training on Single-Machine
+作者在 VQA，VCR，NLVR2 和 Flickr30k 四个视觉语言任务上进行了测试，结果表明 VisualBERT 在四个任务中都达到了最好的表现或和已知最好表现相近的表现。进一步的消融实验表明 VisualBERT 可以有效地学习到语言和相应图像区域的联系，同时也具有一定的句法敏感性。
 
-```
-./scripts/dist_run_single.sh <num_gpus> <task>/train_end2end.py <path_to_cfg> <dir_to_store_checkpoint>
-```
-* ```<num_gpus>```: number of gpus to use.
-* ```<task>```: pretrain/vcr/vqa/refcoco.
-* ```<path_to_cfg>```: config yaml file under ```./cfgs/<task>```.
-* ```<dir_to_store_checkpoint>```: root directory to store checkpoints.
+2. Unicoder-VL
 
 
-Following is a more concrete example:
-```
-./scripts/dist_run_single.sh 4 vcr/train_end2end.py ./cfgs/vcr/base_q2a_4x16G_fp32.yaml ./
-```
+论文标题：Unicoder-VL: A Universal Encoder for Vision and Language by Cross-modal Pre-training
+论文链接：https://arxiv.org/abs/1908.06066
 
-### Distributed Training on Multi-Machine
+该模型与（1）中的 VisualBERT 极其相似，在结构上同样采用堆叠的 Transformer，并且同样在一开始就对图像和语言信息进行对齐和融合。
 
-For example, on 2 machines (A and B), each with 4 GPUs, 
-
-run following command on machine A:
-```
-./scripts/dist_run_multi.sh 2 0 <ip_addr_of_A> 4 <task>/train_end2end.py <path_to_cfg> <dir_to_store_checkpoint>
-```
-
-run following command on machine B:
-```
-./scripts/dist_run_multi.sh 2 1 <ip_addr_of_A> 4 <task>/train_end2end.py <path_to_cfg> <dir_to_store_checkpoint>
-```
+其与 VisualBERT 最大的不同在于改模型在输入端对图像的处理。其文字部分的输入与（1）中相似。在图像的输入上，其首先通过 Faster-RCNN 提取区域图像特征，然后将该特征与区域图像在图像中的位置编码进行拼接再经过一个连接层投影到与语言输入维度相同的空间（如下图所示）。
 
 
-### Non-Distributed Training
-```
-./scripts/nondist_run.sh <task>/train_end2end.py <path_to_cfg> <dir_to_store_checkpoint>
-```
 
-***Note***:
+同样的其也遵循先预训练后微调的模式。该模型在三个任务中进行预训练，前两个与（1）相同为语言掩码和图像语言匹配任务，第三个为图像标签预测，即预测区域图像所物体类别。
 
-1. In yaml files under ```./cfgs```, we set batch size for GPUs with at least 16G memory, you may need to adapt the batch size and 
-gradient accumulation steps according to your actual case, e.g., if you decrease the batch size, you should also 
-increase the gradient accumulation steps accordingly to keep 'actual' batch size for SGD unchanged.
+作者在 MSCOO 和 Flicker30K 上分别进行测试，该模型取得了最佳效果。 
 
-2. For efficiency, we recommend you to use distributed training even on single-machine. But for RefCOCO+, you may meet deadlock
-using distributed training due to unknown reason (it may be related to [PyTorch dataloader deadloack](https://github.com/pytorch/pytorch/issues/1355)), you can simply use
-non-distributed training to solve this problem.
+3. VL-BERT 
 
-## Evaluation
 
-### VCR
-* Local evaluation on val set:
-  ```
-  python vcr/val.py \
-    --a-cfg <cfg_of_q2a> --r-cfg <cfg_of_qa2r> \
-    --a-ckpt <checkpoint_of_q2a> --r-ckpt <checkpoint_of_qa2r> \
-    --gpus <indexes_of_gpus_to_use> \
-    --result-path <dir_to_save_result> --result-name <result_file_name>
-  ```
-  ***Note***: ```<indexes_of_gpus_to_use>``` is gpu indexes, e.g., ```0 1 2 3```.
+论文标题：VL-BERT: Pre-training of Generic Visual-Linguistic Representations
+论文链接：https://arxiv.org/abs/1908.08530
+源码链接：https://github.com/jackroos/VL-BERT
 
-* Generate prediction results on test set for [leaderboard submission](https://visualcommonsense.com/leaderboard/):
-  ```
-  python vcr/test.py \
-    --a-cfg <cfg_of_q2a> --r-cfg <cfg_of_qa2r> \
-    --a-ckpt <checkpoint_of_q2a> --r-ckpt <checkpoint_of_qa2r> \
-    --gpus <indexes_of_gpus_to_use> \
-    --result-path <dir_to_save_result> --result-name <result_file_name>
-  ```
+与上述两个模型相同，VL-BERT 在结构上依旧直接采用堆叠的 Transformer。如下图所示其在输入端与上述两个模型略有不同。
 
-### VQA
-* Generate prediction results on test set for [EvalAI submission](https://evalai.cloudcv.org/web/challenges/challenge-page/163/overview):
-  ```
-  python vqa/test.py \
-    --cfg <cfg_file> \
-    --ckpt <checkpoint> \
-    --gpus <indexes_of_gpus_to_use> \
-    --result-path <dir_to_save_result> --result-name <result_file_name>
-  ```
 
-### RefCOCO+
+首先图像端的输入由以下几个编码的加和构成：a. Faster-RCNN所提取的区域图像特征和该区域在原图像中位置信息的拼；b. 位置编码；c. 片段编码；d. [IMG] 编码。
 
-* Local evaluation on val/testA/testB set:
-  ```
-  python refcoco/test.py \
-    --split <val|testA|testB> \
-    --cfg <cfg_file> \
-    --ckpt <checkpoint> \
-    --gpus <indexes_of_gpus_to_use> \
-    --result-path <dir_to_save_result> --result-name <result_file_name>
-  ```
+在文字端该模型的输入为正常 BERT 文字输入和整个图像特征的加和。同第二个模型相似，该模型分别在三个任务上进行预训练分别为：语言掩码、图像标签分类和图像语言匹配任务。
 
-## Visualization
-See [VISUALIZATION.md](./viz/VISUALIZATION.md).
+作者最后在 VCR, VQA, REC (Referring expression comprehension) 三个任务上测试模型，该模型都取得了最佳或者与最佳相当的表现。
 
-## Acknowledgements
+## 实现逻辑
+上述的paper都基本采用了COCO数据集，但中文领域很难找到能达到COCO规模的数据，因此打算将COCO的英文标注翻译为中文即可得到中文领域的数据集，会存在些翻译导致的偏差。
 
-Many thanks to following codes that help us a lot in building this codebase:
-* [transformers (pytorch-pretrained-bert)](https://github.com/huggingface/transformers) 
-* [Deformable-ConvNets](https://github.com/msracver/Deformable-ConvNets/)
-* [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark)
-* [mmdetection](https://github.com/open-mmlab/mmdetection)
-* [r2c](https://github.com/rowanz/r2c)
-* [allennlp](https://github.com/allenai/allennlp)
-* [bottom-up-attention](https://github.com/peteanderson80/bottom-up-attention)
-* [pythia](https://github.com/facebookresearch/pythia)
-* [MAttNet](https://github.com/lichengunc/MAttNet)
-* [bertviz](https://github.com/jessevig/bertviz)
